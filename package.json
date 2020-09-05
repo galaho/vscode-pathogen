@@ -10,16 +10,25 @@
 		"Other"
 	],
 	"activationEvents": [
-		"onCommand:vscode-pathogen.helloWorld"
+		"onCommand:extension.pathogen.generate"
 	],
 	"main": "./out/extension.js",
 	"contributes": {
 		"commands": [
 			{
-				"command": "vscode-pathogen.helloWorld",
-				"title": "Hello World"
+				"command": "extension.pathogen.generate",
+				"title": "Generate with Pathogen"
 			}
-		]
+		],
+		"menus": {
+			"explorer/context": [
+				{
+					"command": "extension.pathogen.generate",
+					"group": "pathogen",
+					"when": "explorerResourceIsFolder"
+				}
+			]
+		}
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
