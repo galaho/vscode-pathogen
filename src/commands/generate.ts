@@ -2,22 +2,40 @@
 
 import process = require('child_process');
 import vscode = require('vscode');
+import { RSA_PKCS1_OAEP_PADDING } from 'constants';
 
-export async function run(args: any) {
+// Generate returns a command that generates file system entries using pathogen. If
+// args contains a `fsPath` property the entries will be rooted at that location;
+// otherwise the entries will be rooted at the root of the workspace.
+export function Generate(context: vscode.ExtensionContext): (...args: any[]) => any {
+	return async function (args: any) {
+		const destination = args ? args.fsPath : vscode.workspace.rootPath;
+		const sources = <string[]>JSON.parse(context.workspaceState.get('pathogen.sources') || '[]');
+		const source = await showQuickInputBox(sources) || '';
+		const generate = process.spawn('pathogen', ['generate', source, destination]);
 
-    const destination = args ? args.fsPath : vscode.workspace.rootPath;
+		generate.stdout.on('data', async (data: any) => {
+			let value = await vscode.window.showInputBox({ prompt: data.toString().replace(/:$/, '') });
+			generate.stdin.write(`${value}\n`);
+		});
 
-    const remote = await vscode.window.showInputBox({ prompt: "Enter the pathogen template repository" });
+		generate.on('exit', (code) => {
+			if (code === 0) {
+				const sources = <string[]>JSON.parse(context.workspaceState.get('pathogen.sources') || '[]').concat(source);
+				context.workspaceState.update('pathogen.sources', JSON.stringify([...new Set(sources)]));
+			}
+		});
+	};
+};
 
-    if (remote === undefined) {
-        console.error('undefined remote template repository');
-        return;
-    }
-
-    const generate = process.spawn('pathogen', ['generate', remote, destination]);
-
-    generate.stdout.on('data', async (data: any) => {
-        let value = await vscode.window.showInputBox({ prompt: data.toString().replace(/:$/, '') });
-        generate.stdin.write(`${value}\n`);
-    });
+// showQuickInputBox displays a QuickPick that allows for any text.
+function showQuickInputBox(values: string[]): Promise<string | undefined> {
+	return new Promise<string>(resolve => {
+		const i = values.map((label) => ({ label }));
+		const p = vscode.window.createQuickPick();
+		p.items = i;
+		p.onDidAccept(() => { p.hide(); resolve(p.activeItems[0].label); });
+		p.onDidChangeValue((v) => { if (values.indexOf(v) < 0) { p.items = i.concat([{ label: v }]); } });
+		p.show();
+	});
 }
